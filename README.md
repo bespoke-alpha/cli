@@ -50,14 +50,6 @@ $spotifyPackage = Get-AppxPackage | Where-Object -Property Name -Eq "SpotifyAB.S
 
 GPLv3. See [COPYING](COPYING).
 
-## Advanced Usage
-
-// TODO
-`bespoke daemon`
-`bespoke daemon start`
-`bespoke daemon enable`
-`bespoke daemon disable`
-
 ## Todos
 
 -   Add a "spotify.version" semver prop to Metadata.json that will be used to disable non-conforming modules
@@ -75,13 +67,22 @@ GPLv3. See [COPYING](COPYING).
 -   Add linux desktop entry (for custom url scheme)
 -   Package the executable into a `.app` for MacOS
 
+## Advanced Usage
+
+// TODO
+`bespoke daemon`
+`bespoke daemon start`
+`bespoke daemon enable`
+`bespoke daemon disable`
+
+
 ## Dev Setup (hooks)
 
+```pwsh
 cd $env.LOCALAPPDATA/bespoke/
 rm -r hooks/
 git clone github.com/spicetify/hooks hooks/
 cd hooks/
 npm install -g typescript
 tsc
-
-
+```
