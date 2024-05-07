@@ -5,12 +5,9 @@ Note: On windows, use `pwsh` and not `cmd` as shell!
 ### Part 1: Installation
 
 0. First and foremost install the build dependencies: [Git](https://git-scm.com/downloads) and [Go](https://go.dev/doc/install)
-1. Then clone this repo in the appropriate folder:
-    - On Windows, `git clone --depth 1 --recurse-submodules https://github.com/Delusoire/bespoke $env:LOCALAPPDATA/bespoke`
-    - On Linux, `git clone --depth 1 --recurse-submodules https://github.com/Delusoire/bespoke $XDG_CONFIG_HOME/bespoke` (if $XDG_CONFIG_HOME is not set, use `~/.config`)
-    - On macOS, `git clone --depth 1 --recurse-submodules https://github.com/Delusoire/bespoke "$HOME/Library/Application Support/bespoke"`
-2. Change directory to `bespoke/cli/` and execute `go build .`, this will create a new `bespoke` executable in the working directory
-3. [optional] Add the `bespoke` executable to your PATH variable for ease of access
+1. Clone this repo: `git clone --depth 1 --recurse-submodules https://github.com/Delusoire/bespoke-cli`
+2. Run `go build`, this will create a new `bespoke` executable in the working directory
+3. [optional] Add the `bespoke` executable to your PATH variable for ease of access.
     - On Windows, run the following in pwsh:
         ```pwsh
         $user = [EnvironmentVariableTarget]::User
@@ -23,18 +20,15 @@ Note: On windows, use `pwsh` and not `cmd` as shell!
         echo "$HOME/Library/Application Support/bespoke/cli" >> /etc/paths
         ```
     - On other platforms you can perform a simple search on how to set the PATH environment variable
-4. Run `bespoke init` to initialize the bespoke setup, this only needs to be done once. If the command files, try running it in an elevated shell (as Administrator)
+4. Run `bespoke init` to initialize the bespoke setup, this only needs to be done once. If the command fails, try running it in an elevated shell (as Administrator)
 
 ### Part 2: Patching
 
+5. Run `bespoke sync` to download and install the latest [hooks](https://github.com/spicetify/hooks)
 4. Run `bespoke apply` to patch the Spotify desktop client, this needs only be done
    when using bespoke for the first time or when the Spotify client updates (and reverts all the patches).
 
 You can always revert this by running `bespoke fix`.
-
-### Part 3: Updating
-
-To update bespoke, all you need to run is `git pull --recurse-submodules`
 
 ## Caveats
 
@@ -58,9 +52,11 @@ GPLv3. See [COPYING](COPYING).
 
 ## Advanced Usage
 
-`bespoke daemon enable`
-
 // TODO
+`bespoke daemon`
+`bespoke daemon start`
+`bespoke daemon enable`
+`bespoke daemon disable`
 
 ### Todos
 
@@ -78,3 +74,14 @@ GPLv3. See [COPYING](COPYING).
 -   Improve spotify paths recognition on Linux
 -   Add linux desktop entry (for custom url scheme)
 -   Package the executable into a `.app` for MacOS
+
+### Dev setup (hooks)
+
+cd $env.LOCALAPPDATA/bespoke/
+rm -r hooks/
+git clone github.com/spicetify/hooks hooks/
+cd hooks/
+npm install -g typescript
+tsc
+
+
