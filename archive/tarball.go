@@ -28,7 +28,7 @@ import (
 	"regexp"
 )
 
-func UnTarGZ(r io.Reader, src string, dest string) error {
+func UnTarGZ(r io.Reader, src *regexp.Regexp, dest string) error {
 	gzipReader, err := gzip.NewReader(r)
 	if err != nil {
 		return err
@@ -36,8 +36,6 @@ func UnTarGZ(r io.Reader, src string, dest string) error {
 	defer gzipReader.Close()
 
 	tarReader := tar.NewReader(gzipReader)
-
-	re := regexp.MustCompile(`^[^/]+/` + src + "(.*)")
 
 	for {
 		header, err := tarReader.Next()
@@ -48,7 +46,7 @@ func UnTarGZ(r io.Reader, src string, dest string) error {
 			return err
 		}
 
-		nameRelToSrc := re.FindStringSubmatch(header.Name)
+		nameRelToSrc := src.FindStringSubmatch(header.Name)
 
 		if nameRelToSrc == nil {
 			continue

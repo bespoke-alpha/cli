@@ -29,7 +29,7 @@ import (
 )
 
 // pasta from https://stackoverflow.com/a/24792688
-func Unzip(src, dest string) error {
+func UnZip(src, dest string) error {
 	r, err := zip.OpenReader(src)
 	if err != nil {
 		return err

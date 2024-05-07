@@ -263,7 +263,9 @@ func downloadModule(module Module) error {
 
 	moduleFolder := filepath.Join(modulesFolder, module.metadata.getFileIdentifier())
 
-	return archive.UnTarGZ(res.Body, module.githubPath.path, moduleFolder)
+	srcRe := regexp.MustCompile(`^[^/]+/` + module.githubPath.path + "(.*)")
+
+	return archive.UnTarGZ(res.Body, srcRe, moduleFolder)
 }
 
 func AddModuleMURL(metadataURL MetadataURL) error {

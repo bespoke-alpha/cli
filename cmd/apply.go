@@ -54,7 +54,7 @@ func extractSpa(spa string, destFolder string) error {
 	basename := filepath.Base(spa)
 	extractDest := filepath.Join(destFolder, strings.TrimSuffix(basename, ".spa"))
 	log.Println("Extracting", spa, "->", extractDest)
-	if err := archive.Unzip(spa, extractDest); err != nil {
+	if err := archive.UnZip(spa, extractDest); err != nil {
 		return err
 	}
 	if !mirror {
