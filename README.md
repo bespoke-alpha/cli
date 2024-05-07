@@ -75,7 +75,7 @@ GPLv3. See [COPYING](COPYING).
 -   Add linux desktop entry (for custom url scheme)
 -   Package the executable into a `.app` for MacOS
 
-## Dev setup (hooks)
+## Dev Setup (hooks)
 
 cd $env.LOCALAPPDATA/bespoke/
 rm -r hooks/
