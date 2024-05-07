@@ -58,7 +58,7 @@ GPLv3. See [COPYING](COPYING).
 `bespoke daemon enable`
 `bespoke daemon disable`
 
-### Todos
+## Todos
 
 -   Add a "spotify.version" semver prop to Metadata.json that will be used to disable non-conforming modules
 -   Improve classname remapping:
@@ -75,7 +75,7 @@ GPLv3. See [COPYING](COPYING).
 -   Add linux desktop entry (for custom url scheme)
 -   Package the executable into a `.app` for MacOS
 
-### Dev setup (hooks)
+## Dev setup (hooks)
 
 cd $env.LOCALAPPDATA/bespoke/
 rm -r hooks/
