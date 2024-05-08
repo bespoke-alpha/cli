@@ -5,7 +5,7 @@ Note: On windows, use `pwsh` and not `cmd` as shell!
 ### Part 1: Installation
 
 0. First and foremost install the build dependencies: [Git](https://git-scm.com/downloads) and [Go](https://go.dev/doc/install)
-1. Clone this repo: `git clone --depth 1 --recurse-submodules https://github.com/Delusoire/bespoke-cli`
+1. Clone this repo: `git clone github.com/Delusoire/bespoke-cli`
 2. Run `go build`, this will create a new `bespoke` executable in the working directory
 3. [optional] Add the `bespoke` executable to your PATH variable for ease of access.
     - On Windows, run the following in pwsh:
@@ -25,7 +25,7 @@ Note: On windows, use `pwsh` and not `cmd` as shell!
 ### Part 2: Patching
 
 5. Run `bespoke sync` to download and install the latest [hooks](https://github.com/spicetify/hooks)
-4. Run `bespoke apply` to patch the Spotify desktop client, this needs only be done
+6. Run `bespoke apply` to patch the Spotify desktop client, this needs only be done
    when using bespoke for the first time or when the Spotify client updates (and reverts all the patches).
 
 You can always revert this by running `bespoke fix`.
@@ -74,7 +74,6 @@ GPLv3. See [COPYING](COPYING).
 `bespoke daemon start`
 `bespoke daemon enable`
 `bespoke daemon disable`
-
 
 ## Dev Setup (hooks)
 
