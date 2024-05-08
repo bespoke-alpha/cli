@@ -70,5 +70,5 @@ func execInit() error {
 		log.Println(err.Error())
 	}
 
-	return module.SetVault(&module.Vault{Modules: map[string]module.MinimalModule{}})
+	return module.SetVault(&module.Vault{Modules: map[module.Author]map[module.Name]module.ByVersions{}})
 }

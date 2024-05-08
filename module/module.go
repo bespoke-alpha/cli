@@ -108,9 +108,9 @@ func (ghp VersionedGithubPath) getRepoArchiveLink() string {
 	return url
 }
 
-type MinimalModule struct {
-	MetadataURL       MetadataURL `json:"metadata"`
-	RemoteMetadataURL MetadataURL `json:"remoteMetadata"`
+type MetadataURL struct {
+	Local  URL `json:"local"`
+	Remote URL `json:"remote"`
 }
 
 type Author string
@@ -120,8 +120,8 @@ type Version string
 type ByAuthors = map[Author]ByNames
 type ByNames = map[Name]ByVersions
 type ByVersions struct {
-	Enabled  Version                   `json:"enabled"`
-	Versions map[Version]MinimalModule `json:"versions"`
+	Enabled   Version                 `json:"enabled"`
+	Metadatas map[Version]MetadataURL `json:"metadatas"`
 }
 type Vault struct {
 	Modules ByAuthors `json:"modules"`
@@ -136,13 +136,13 @@ func (v *Vault) getAllModuleVersions(identifier ModuleIdentifier) (ByVersions, b
 	return versions, ok
 }
 
-func (v *Vault) getEnabledModule(identifier ModuleIdentifier) (*MinimalModule, bool) {
-	module := MinimalModule{}
+func (v *Vault) getEnabledModule(identifier ModuleIdentifier) (*MetadataURL, bool) {
+	module := MetadataURL{}
 	versions, ok := v.getAllModuleVersions(identifier)
 	if !ok {
 		return &module, false
 	}
-	module, ok = versions.Versions[versions.Enabled]
+	module, ok = versions.Metadatas[versions.Enabled]
 	return &module, ok
 }
 
@@ -160,17 +160,17 @@ func (v *Vault) setEnabledModule(identifier StoreIdentifier) bool {
 	return true
 }
 
-func (v *Vault) getModule(m *Metadata) (MinimalModule, bool) {
-	module := MinimalModule{}
+func (v *Vault) getModule(m *Metadata) (MetadataURL, bool) {
+	module := MetadataURL{}
 	versions, ok := v.getAllModuleVersions(m.getModuleIdentifier())
 	if !ok {
 		return module, false
 	}
-	module, ok = versions.Versions[Version(m.Version)]
+	module, ok = versions.Metadatas[Version(m.Version)]
 	return module, ok
 }
 
-func (v *Vault) setModule(m *Metadata, module *MinimalModule) bool {
+func (v *Vault) setModule(m *Metadata, module *MetadataURL) bool {
 	if len(m.Version) == 0 {
 		return false
 	}
@@ -178,12 +178,12 @@ func (v *Vault) setModule(m *Metadata, module *MinimalModule) bool {
 	if !ok {
 		return false
 	}
-	versions.Versions[Version(m.Version)] = *module
+	versions.Metadatas[Version(m.Version)] = *module
 	return true
 }
 
 // https://raw.githubusercontent.com/<owner>/<repo>/<branch|tag|commit>/path/to/module/metadata.json
-type MetadataURL = string
+type URL = string
 
 type ModuleIdentifier struct {
 	Author
@@ -280,7 +280,7 @@ func parseMetadata(r io.Reader) (Metadata, error) {
 	return metadata, nil
 }
 
-func fetchRemoteMetadata(metadataURL MetadataURL) (Metadata, error) {
+func fetchRemoteMetadata(metadataURL URL) (Metadata, error) {
 	res, err := http.Get(metadataURL)
 	if err != nil {
 		return Metadata{}, err
@@ -290,7 +290,7 @@ func fetchRemoteMetadata(metadataURL MetadataURL) (Metadata, error) {
 	return parseMetadata(res.Body)
 }
 
-func parseGithubRawLink(metadataURL MetadataURL) (VersionedGithubPath, error) {
+func parseGithubRawLink(metadataURL URL) (VersionedGithubPath, error) {
 
 	submatches := githubRawRe.FindStringSubmatch(metadataURL)
 	if submatches == nil {
@@ -344,7 +344,7 @@ func parseGithubRawLink(metadataURL MetadataURL) (VersionedGithubPath, error) {
 	}, nil
 }
 
-func downloadModuleInStore(metadataURL MetadataURL, storeIdentifier StoreIdentifier) error {
+func downloadModuleInStore(metadataURL URL, storeIdentifier StoreIdentifier) error {
 	githubPath, err := parseGithubRawLink(metadataURL)
 	if err != nil {
 		return err
@@ -365,7 +365,7 @@ func deleteModuleInStore(identifier StoreIdentifier) error {
 	return os.RemoveAll(identifier.toFilePath())
 }
 
-func AddModuleInVault(metadata *Metadata, module *MinimalModule) error {
+func AddModuleInVault(metadata *Metadata, module *MetadataURL) error {
 	return MutateVault(func(vault *Vault) bool {
 		return vault.setModule(metadata, module)
 	})
@@ -405,12 +405,12 @@ func RemoveModuleInVault(identifier StoreIdentifier) error {
 			modules.Enabled = ""
 			destroySymlink(identifier.ModuleIdentifier)
 		}
-		delete(modules.Versions, identifier.Version)
+		delete(modules.Metadatas, identifier.Version)
 		return true
 	})
 }
 
-func InstallModuleMURL(metadataURL MetadataURL) error {
+func InstallModuleMURL(metadataURL URL) error {
 	metadata, err := fetchRemoteMetadata(metadataURL)
 	if err != nil {
 		return err
@@ -425,9 +425,9 @@ func InstallModuleMURL(metadataURL MetadataURL) error {
 
 	moduleIdentifier := metadata.getModuleIdentifier()
 
-	return AddModuleInVault(&metadata, &MinimalModule{
-		MetadataURL:       "/modules/" + moduleIdentifier.toPath() + "/metadata.json",
-		RemoteMetadataURL: metadataURL,
+	return AddModuleInVault(&metadata, &MetadataURL{
+		Local:  "/modules/" + moduleIdentifier.toPath() + "/metadata.json",
+		Remote: metadataURL,
 	})
 }
 
