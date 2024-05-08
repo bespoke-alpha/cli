@@ -48,7 +48,7 @@ func installHooks() error {
 	}
 	defer res.Body.Close()
 
-	re := regexp.MustCompile("^(.*)$")
+	re := regexp.MustCompile(`^(.*)$`)
 
 	return archive.UnTarGZ(res.Body, re, filepath.Join(paths.ConfigPath, "hooks"))
 }

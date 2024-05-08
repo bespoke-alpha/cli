@@ -52,18 +52,18 @@ func HandleProtocol(message string) error {
 	switch action {
 	case "add":
 		metadataURL := arguments
-		return module.AddModuleMURL(metadataURL)
+		return module.InstallModuleMURL(metadataURL)
 
 	case "remove":
-		identifier := arguments
-		return module.RemoveModule(identifier)
+		identifier := module.NewStoreIdentifier(arguments)
+		return module.DeleteModule(identifier)
 
 	case "enable":
-		identifier := arguments
+		identifier := module.NewStoreIdentifier(arguments)
 		return module.ToggleModuleInVault(identifier, true)
 
 	case "disable":
-		identifier := arguments
+		identifier := module.NewStoreIdentifier(arguments)
 		return module.ToggleModuleInVault(identifier, false)
 	}
 	return e.ErrUnsupportedOperation

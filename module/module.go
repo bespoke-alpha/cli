@@ -54,12 +54,22 @@ type Metadata struct {
 	SpotifyVersions string   `json:"spotifyVersions"`
 }
 
-func (m Metadata) getIdentifier() string {
-	return path.Join(m.Authors[0], m.Name)
+func (m *Metadata) getAuthor() string {
+	return m.Authors[0]
 }
 
-func (m Metadata) getFileIdentifier() string {
-	return filepath.Join(m.Authors[0], m.Name)
+func (m *Metadata) getModuleIdentifier() ModuleIdentifier {
+	return ModuleIdentifier{
+		Author: Author(m.getAuthor()),
+		Name:   Name(m.Name),
+	}
+}
+
+func (m *Metadata) getStoreIdentifier() StoreIdentifier {
+	return StoreIdentifier{
+		ModuleIdentifier: m.getModuleIdentifier(),
+		Version:          Version(m.Version),
+	}
 }
 
 type GithubPathVersion struct {
@@ -69,48 +79,174 @@ type GithubPathVersion struct {
 	branch string
 }
 
-type GithubPath struct {
+type VersionedGithubPath struct {
 	owner   string
 	repo    string
 	version GithubPathVersion
 	path    string
 }
 
-type Module struct {
-	metadata   Metadata
-	githubPath GithubPath
+var githubRawRe = regexp.MustCompile(`https://raw.githubusercontent.com/(?<owner>[^/]+)/(?<repo>[^/]+)/(?<version>[^/]+)/(?<dirname>.*?)/?(?<basename>[^/])+$`)
+
+func (ghp VersionedGithubPath) getRepoArchiveLink() string {
+	url := "https://github.com/" + ghp.owner + "/" + ghp.repo + "/archive/"
+
+	switch ghp.version.__type {
+	case "commit":
+		url += ghp.version.commit
+
+	case "tag":
+		url += "refs/tags/" + ghp.version.tag
+
+	case "branch":
+		url += "refs/heads/" + ghp.version.branch
+
+	}
+
+	url += ".tar.gz"
+
+	return url
 }
 
 type MinimalModule struct {
-	Enabled           bool        `json:"enabled"`
 	MetadataURL       MetadataURL `json:"metadata"`
 	RemoteMetadataURL MetadataURL `json:"remoteMetadata"`
 }
 
+type Author string
+type Name string
+type Version string
+
+type ByAuthors = map[Author]ByNames
+type ByNames = map[Name]ByVersions
+type ByVersions struct {
+	Enabled  Version                   `json:"enabled"`
+	Versions map[Version]MinimalModule `json:"versions"`
+}
 type Vault struct {
-	Modules map[string]MinimalModule `json:"modules"`
+	Modules ByAuthors `json:"modules"`
+}
+
+func (v *Vault) getAllModuleVersions(identifier ModuleIdentifier) (ByVersions, bool) {
+	names, ok := v.Modules[identifier.Author]
+	if !ok {
+		return ByVersions{}, false
+	}
+	versions, ok := names[identifier.Name]
+	return versions, ok
+}
+
+func (v *Vault) getEnabledModule(identifier ModuleIdentifier) (*MinimalModule, bool) {
+	module := MinimalModule{}
+	versions, ok := v.getAllModuleVersions(identifier)
+	if !ok {
+		return &module, false
+	}
+	module, ok = versions.Versions[versions.Enabled]
+	return &module, ok
+}
+
+func (v *Vault) setEnabledModule(identifier StoreIdentifier) bool {
+	versions, ok := v.getAllModuleVersions(identifier.ModuleIdentifier)
+	if !ok {
+		return false
+	}
+	versions.Enabled = identifier.Version
+	if len(versions.Enabled) == 0 {
+		destroySymlink(identifier.ModuleIdentifier)
+	} else {
+		createSymlink(identifier)
+	}
+	return true
+}
+
+func (v *Vault) getModule(m *Metadata) (MinimalModule, bool) {
+	module := MinimalModule{}
+	versions, ok := v.getAllModuleVersions(m.getModuleIdentifier())
+	if !ok {
+		return module, false
+	}
+	module, ok = versions.Versions[Version(m.Version)]
+	return module, ok
+}
+
+func (v *Vault) setModule(m *Metadata, module *MinimalModule) bool {
+	if len(m.Version) == 0 {
+		return false
+	}
+	versions, ok := v.getAllModuleVersions(m.getModuleIdentifier())
+	if !ok {
+		return false
+	}
+	versions.Versions[Version(m.Version)] = *module
+	return true
 }
 
 // https://raw.githubusercontent.com/<owner>/<repo>/<branch|tag|commit>/path/to/module/metadata.json
 type MetadataURL = string
 
+type ModuleIdentifier struct {
+	Author
+	Name
+}
+
 // <owner>/<module>
-type Identifier = string
+var moduleIdentifierRe = regexp.MustCompile(`^(?<author>[^/]+)/(?<name>[^/]+)$`)
+
+func NewModuleIdentifier(identifier string) ModuleIdentifier {
+	parts := moduleIdentifierRe.FindStringSubmatch(identifier)
+	return ModuleIdentifier{
+		Author: Author(parts[0]),
+		Name:   Name(parts[1]),
+	}
+}
+
+func (mi *ModuleIdentifier) toPath() string {
+	return path.Join(string(mi.Author), string(mi.Name))
+}
+
+func (mi *ModuleIdentifier) toFilePath() string {
+	return filepath.Join(modulesFolder, string(mi.Author), string(mi.Name))
+}
+
+type StoreIdentifier struct {
+	ModuleIdentifier
+	Version
+}
+
+// <owner>/<module>/<version>
+var storeIdentifierRe = regexp.MustCompile(`^(?<identifier>[^/]+/[^/]+)/(?<version>[^/]+)$`)
+
+func NewStoreIdentifier(identifier string) StoreIdentifier {
+	parts := storeIdentifierRe.FindStringSubmatch(identifier)
+	return StoreIdentifier{
+		ModuleIdentifier: NewModuleIdentifier(parts[0]),
+		Version:          Version(parts[1]),
+	}
+}
+
+func (si *StoreIdentifier) toPath() string {
+	return filepath.Join(string(si.Author), string(si.Name), string(si.Version))
+}
+
+func (si *StoreIdentifier) toFilePath() string {
+	return filepath.Join(storeFolder, string(si.Author), string(si.Name), string(si.Version))
+}
 
 var modulesFolder = filepath.Join(paths.ConfigPath, "modules")
-
+var storeFolder = filepath.Join(paths.ConfigPath, "store")
 var vaultPath = filepath.Join(modulesFolder, "vault.json")
 
-func GetVault() (Vault, error) {
+func GetVault() (*Vault, error) {
 	file, err := os.Open(vaultPath)
 	if err != nil {
-		return Vault{}, err
+		return &Vault{}, err
 	}
 	defer file.Close()
 
 	var vault Vault
 	err = json.NewDecoder(file).Decode(&vault)
-	return vault, err
+	return &vault, err
 }
 
 func SetVault(vault *Vault) error {
@@ -123,15 +259,17 @@ func SetVault(vault *Vault) error {
 	return os.WriteFile(vaultPath, vaultJson, 0700)
 }
 
-func MutateVault(mutate func(*Vault)) error {
+func MutateVault(mutate func(*Vault) bool) error {
 	vault, err := GetVault()
 	if err != nil {
 		return err
 	}
 
-	mutate(&vault)
+	if ok := mutate(vault); !ok {
+		return errors.New("failed to mutate vault")
+	}
 
-	return SetVault(&vault)
+	return SetVault(vault)
 }
 
 func parseMetadata(r io.Reader) (Metadata, error) {
@@ -142,7 +280,7 @@ func parseMetadata(r io.Reader) (Metadata, error) {
 	return metadata, nil
 }
 
-func fetchMetadata(metadataURL MetadataURL) (Metadata, error) {
+func fetchRemoteMetadata(metadataURL MetadataURL) (Metadata, error) {
 	res, err := http.Get(metadataURL)
 	if err != nil {
 		return Metadata{}, err
@@ -152,28 +290,11 @@ func fetchMetadata(metadataURL MetadataURL) (Metadata, error) {
 	return parseMetadata(res.Body)
 }
 
-func getLocalMetadataFile(identifier Identifier) string {
-	return "/modules/" + identifier + "/metadata.json"
-}
+func parseGithubRawLink(metadataURL MetadataURL) (VersionedGithubPath, error) {
 
-func fetchLocalMetadata(identifier string) (Metadata, error) {
-	moduleFolder := filepath.Join(modulesFolder, identifier)
-	metadataFile := filepath.Join(moduleFolder, "metadata.json")
-
-	file, err := os.Open(metadataFile)
-	if err != nil {
-		return Metadata{}, err
-	}
-	defer file.Close()
-
-	return parseMetadata(file)
-}
-
-func parseGithubPath(metadataURL MetadataURL) (GithubPath, error) {
-	re := regexp.MustCompile(`https://raw.githubusercontent.com/(?<owner>[^/]+)/(?<repo>[^/]+)/(?<version>[^/]+)/(?<path>.*?)/?metadata\.json$`)
-	submatches := re.FindStringSubmatch(metadataURL)
+	submatches := githubRawRe.FindStringSubmatch(metadataURL)
 	if submatches == nil {
-		return GithubPath{}, errors.New("URL cannot be parsed")
+		return VersionedGithubPath{}, errors.New("URL cannot be parsed")
 	}
 
 	owner := submatches[1]
@@ -183,7 +304,7 @@ func parseGithubPath(metadataURL MetadataURL) (GithubPath, error) {
 
 	branches, _, err := client.Repositories.ListBranches(context.Background(), owner, repo, &github.ListOptions{})
 	if err != nil {
-		return GithubPath{}, err
+		return VersionedGithubPath{}, err
 	}
 
 	branchNames := []string{}
@@ -206,7 +327,7 @@ func parseGithubPath(metadataURL MetadataURL) (GithubPath, error) {
 	} else {
 		tag, err := url.QueryUnescape(v)
 		if err != nil {
-			return GithubPath{}, err
+			return VersionedGithubPath{}, err
 		}
 
 		version = GithubPathVersion{
@@ -215,7 +336,7 @@ func parseGithubPath(metadataURL MetadataURL) (GithubPath, error) {
 		}
 	}
 
-	return GithubPath{
+	return VersionedGithubPath{
 		owner,
 		repo,
 		version,
@@ -223,136 +344,104 @@ func parseGithubPath(metadataURL MetadataURL) (GithubPath, error) {
 	}, nil
 }
 
-func fetchModule(metadataURL MetadataURL) (Module, error) {
-	metadata, err := fetchMetadata(metadataURL)
+func downloadModuleInStore(metadataURL MetadataURL, storeIdentifier StoreIdentifier) error {
+	githubPath, err := parseGithubRawLink(metadataURL)
 	if err != nil {
-		return Module{}, err
-	}
-	githubPath, err := parseGithubPath(metadataURL)
-	if err != nil {
-		return Module{}, err
+		return err
 	}
 
-	return Module{
-		metadata,
-		githubPath,
-	}, nil
-}
-
-func downloadModule(module Module) error {
-	url := "https://github.com/" + module.githubPath.owner + "/" + module.githubPath.repo + "/archive/"
-
-	switch module.githubPath.version.__type {
-	case "commit":
-		url += module.githubPath.version.commit
-
-	case "tag":
-		url += "refs/tags/" + module.githubPath.version.tag
-
-	case "branch":
-		url += "refs/heads/" + module.githubPath.version.branch
-
-	}
-
-	url += ".tar.gz"
-
-	res, err := http.Get(url)
+	res, err := http.Get(githubPath.getRepoArchiveLink())
 	if err != nil {
 		return err
 	}
 	defer res.Body.Close()
 
-	moduleFolder := filepath.Join(modulesFolder, module.metadata.getFileIdentifier())
+	srcRe := regexp.MustCompile(`^[^/]+/` + githubPath.path + "(.*)")
 
-	srcRe := regexp.MustCompile(`^[^/]+/` + module.githubPath.path + "(.*)")
-
-	return archive.UnTarGZ(res.Body, srcRe, moduleFolder)
+	return archive.UnTarGZ(res.Body, srcRe, storeIdentifier.toFilePath())
 }
 
-func AddModuleMURL(metadataURL MetadataURL) error {
-	metadata, err := fetchMetadata(metadataURL)
-	if err != nil {
-		return err
-	}
+func deleteModuleInStore(identifier StoreIdentifier) error {
+	return os.RemoveAll(identifier.toFilePath())
+}
 
-	fileIdentifier := metadata.getFileIdentifier()
-
-	localMetadata, err := fetchLocalMetadata(fileIdentifier)
-	if err == nil {
-		if metadata.Version == localMetadata.Version {
-			return nil
-		}
-
-		if err := RemoveModule(fileIdentifier); err != nil {
-			return err
-		}
-	}
-
-	githubPath, err := parseGithubPath(metadataURL)
-	if err != nil {
-		return err
-	}
-
-	err = downloadModule(Module{
-		metadata,
-		githubPath,
+func AddModuleInVault(metadata *Metadata, module *MinimalModule) error {
+	return MutateVault(func(vault *Vault) bool {
+		return vault.setModule(metadata, module)
 	})
+}
+
+func ToggleModuleInVault(identifier StoreIdentifier, enabled bool) error {
+	vault, err := GetVault()
 	if err != nil {
 		return err
 	}
 
-	identifier := metadata.getIdentifier()
+	modules, ok := vault.getAllModuleVersions(identifier.ModuleIdentifier)
+	if !ok {
+		return errors.New("no modules with identifier " + identifier.toPath())
+	}
 
-	return AddModuleInVault(identifier, MinimalModule{
-		Enabled:           true,
-		MetadataURL:       getLocalMetadataFile(identifier),
+	if enabled {
+		modules.Enabled = identifier.Version
+		createSymlink(identifier)
+	} else if modules.Enabled == identifier.Version {
+		modules.Enabled = ""
+		destroySymlink(identifier.ModuleIdentifier)
+	} else {
+		return nil
+	}
+
+	return SetVault(vault)
+}
+
+func RemoveModuleInVault(identifier StoreIdentifier) error {
+	return MutateVault(func(vault *Vault) bool {
+		modules, ok := vault.getAllModuleVersions(identifier.ModuleIdentifier)
+		if !ok {
+			return false
+		}
+		if modules.Enabled == identifier.Version {
+			modules.Enabled = ""
+			destroySymlink(identifier.ModuleIdentifier)
+		}
+		delete(modules.Versions, identifier.Version)
+		return true
+	})
+}
+
+func InstallModuleMURL(metadataURL MetadataURL) error {
+	metadata, err := fetchRemoteMetadata(metadataURL)
+	if err != nil {
+		return err
+	}
+
+	storeIdentifier := metadata.getStoreIdentifier()
+
+	err = downloadModuleInStore(metadataURL, storeIdentifier)
+	if err != nil {
+		return err
+	}
+
+	moduleIdentifier := metadata.getModuleIdentifier()
+
+	return AddModuleInVault(&metadata, &MinimalModule{
+		MetadataURL:       "/modules/" + moduleIdentifier.toPath() + "/metadata.json",
 		RemoteMetadataURL: metadataURL,
 	})
 }
 
-func RemoveModule(identifier Identifier) error {
-	moduleFolder := filepath.Join(modulesFolder, identifier)
-	err := RemoveModuleInVault(identifier)
-	if err != nil {
+func DeleteModule(identifier StoreIdentifier) error {
+	if err := RemoveModuleInVault(identifier); err != nil {
 		return err
 	}
-	return os.RemoveAll(moduleFolder)
+	return deleteModuleInStore(identifier)
 }
 
-func AddModuleInVault(identifier Identifier, module MinimalModule) error {
-	return MutateVault(func(vault *Vault) {
-		(*vault).Modules[identifier] = module
-	})
+func createSymlink(identifier StoreIdentifier) {
+	os.Symlink(identifier.toFilePath(), identifier.ModuleIdentifier.toFilePath())
 }
 
-func ToggleModuleInVault(identifier Identifier, enabled bool) error {
-	vault, err := GetVault()
-	if err != nil {
-		return err
-	}
-
-	module := vault.Modules[identifier]
-	module.Enabled = enabled
-
-	return AddModuleInVault(identifier, module)
-}
-
-func RemoveModuleInVault(identifier Identifier) error {
-	return MutateVault(func(vault *Vault) {
-		delete((*vault).Modules, identifier)
-	})
-}
-
-func getVaultMURLFromIdentifier(identifier Identifier) (MetadataURL, error) {
-	vault, err := GetVault()
-	if err != nil {
-		return "", err
-	}
-
-	metadataURL := vault.Modules[identifier].MetadataURL
-	if metadataURL == "" {
-		err = errors.New("Can't find a module for the identifier " + identifier)
-	}
-
-	return metadataURL, err
+func destroySymlink(identifier ModuleIdentifier) {
+	os.Remove(identifier.toFilePath())
 }

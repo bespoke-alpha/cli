@@ -32,25 +32,25 @@ var pkgCmd = &cobra.Command{
 	Run:   func(cmd *cobra.Command, args []string) {},
 }
 
-var pkgAddCmd = &cobra.Command{
-	Use:   "add [murl]",
+var pkgInstallCmd = &cobra.Command{
+	Use:   "install [murl]",
 	Short: "Install module",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		metadataURL := args[0]
-		if err := module.AddModuleMURL(metadataURL); err != nil {
+		if err := module.InstallModuleMURL(metadataURL); err != nil {
 			log.Fatalln(err.Error())
 		}
 	},
 }
 
-var pkgRemCmd = &cobra.Command{
+var pkgDeleteCmd = &cobra.Command{
 	Use:   "rem [id]",
 	Short: "Uninstall module",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		identifier := args[0]
-		if err := module.RemoveModule(identifier); err != nil {
+		identifier := module.NewStoreIdentifier(args[0])
+		if err := module.DeleteModule(identifier); err != nil {
 			log.Fatalln(err.Error())
 		}
 	},
@@ -61,7 +61,7 @@ var pkgEnableCmd = &cobra.Command{
 	Short: "Enable installed module",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		identifier := args[0]
+		identifier := module.NewStoreIdentifier(args[0])
 		if err := module.ToggleModuleInVault(identifier, true); err != nil {
 			log.Fatalln(err.Error())
 		}
@@ -73,7 +73,7 @@ var pkgDisableCmd = &cobra.Command{
 	Short: "Disable installed module",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		identifier := args[0]
+		identifier := module.NewStoreIdentifier(args[0])
 		if err := module.ToggleModuleInVault(identifier, false); err != nil {
 			log.Fatalln(err.Error())
 		}
@@ -83,5 +83,5 @@ var pkgDisableCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(pkgCmd)
 
-	pkgCmd.AddCommand(pkgAddCmd, pkgRemCmd, pkgEnableCmd, pkgDisableCmd)
+	pkgCmd.AddCommand(pkgInstallCmd, pkgDeleteCmd, pkgEnableCmd, pkgDisableCmd)
 }
