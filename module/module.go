@@ -119,6 +119,7 @@ func SetVault(vault *Vault) error {
 		return err
 	}
 
+	os.MkdirAll(modulesFolder, os.ModePerm)
 	return os.WriteFile(vaultPath, vaultJson, 0700)
 }
 

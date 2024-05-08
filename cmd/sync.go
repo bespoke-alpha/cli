@@ -40,6 +40,7 @@ var syncCmd = &cobra.Command{
 	},
 }
 
+// TODO: let the user choose which release to install (& include version compatibility info)
 func installHooks() error {
 	res, err := http.Get("http://github.com/spicetify/hooks/releases/latest/download/hooks.tar.gz")
 	if err != nil {

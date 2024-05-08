@@ -70,8 +70,5 @@ func execInit() error {
 		log.Println(err.Error())
 	}
 
-	// TODO: add default vault.json config here
-	module.SetVault(&module.Vault{Modules: map[string]module.MinimalModule{}})
-
-	return nil
+	return module.SetVault(&module.Vault{Modules: map[string]module.MinimalModule{}})
 }
