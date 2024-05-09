@@ -215,7 +215,7 @@ type StoreIdentifier struct {
 }
 
 // <owner>/<module>/<version>
-var storeIdentifierRe = regexp.MustCompile(`^(?<identifier>[^/]+/[^/]+)/(?<version>[^/]+)$`)
+var storeIdentifierRe = regexp.MustCompile(`^(?<identifier>[^/]+/[^/]+)/(?<version>[^/]*)$`)
 
 func NewStoreIdentifier(identifier string) StoreIdentifier {
 	parts := storeIdentifierRe.FindStringSubmatch(identifier)
