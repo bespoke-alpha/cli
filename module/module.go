@@ -108,9 +108,9 @@ func (ghp VersionedGithubPath) getRepoArchiveLink() string {
 	return url
 }
 
-type MetadataURL struct {
-	Local  URL `json:"local"`
-	Remote URL `json:"remote"`
+type Store struct {
+	Installed bool `json:"local"`
+	Remote    URL  `json:"remote"`
 }
 
 type Author string
@@ -120,8 +120,8 @@ type Version string
 type ByAuthors = map[Author]ByNames
 type ByNames = map[Name]ByVersions
 type ByVersions struct {
-	Enabled   Version                 `json:"enabled"`
-	Metadatas map[Version]MetadataURL `json:"metadatas"`
+	Enabled Version           `json:"enabled"`
+	V       map[Version]Store `json:"v"`
 }
 type Vault struct {
 	Modules ByAuthors `json:"modules"`
@@ -136,41 +136,27 @@ func (v *Vault) getAllModuleVersions(identifier ModuleIdentifier) (ByVersions, b
 	return versions, ok
 }
 
-func (v *Vault) getEnabledModule(identifier ModuleIdentifier) (*MetadataURL, bool) {
-	module := MetadataURL{}
+func (v *Vault) getEnabledModule(identifier ModuleIdentifier) (*Store, bool) {
+	module := Store{}
 	versions, ok := v.getAllModuleVersions(identifier)
 	if !ok {
 		return &module, false
 	}
-	module, ok = versions.Metadatas[versions.Enabled]
+	module, ok = versions.V[versions.Enabled]
 	return &module, ok
 }
 
-func (v *Vault) setEnabledModule(identifier StoreIdentifier) bool {
-	versions, ok := v.getAllModuleVersions(identifier.ModuleIdentifier)
-	if !ok {
-		return false
-	}
-	versions.Enabled = identifier.Version
-	if len(versions.Enabled) == 0 {
-		destroySymlink(identifier.ModuleIdentifier)
-	} else {
-		createSymlink(identifier)
-	}
-	return true
-}
-
-func (v *Vault) getModule(m *Metadata) (MetadataURL, bool) {
-	module := MetadataURL{}
+func (v *Vault) getModule(m *Metadata) (Store, bool) {
+	module := Store{}
 	versions, ok := v.getAllModuleVersions(m.getModuleIdentifier())
 	if !ok {
 		return module, false
 	}
-	module, ok = versions.Metadatas[Version(m.Version)]
+	module, ok = versions.V[Version(m.Version)]
 	return module, ok
 }
 
-func (v *Vault) setModule(m *Metadata, module *MetadataURL) bool {
+func (v *Vault) setModule(m *Metadata, module *Store) bool {
 	if len(m.Version) == 0 {
 		return false
 	}
@@ -178,7 +164,7 @@ func (v *Vault) setModule(m *Metadata, module *MetadataURL) bool {
 	if !ok {
 		return false
 	}
-	versions.Metadatas[Version(m.Version)] = *module
+	versions.V[Version(m.Version)] = *module
 	return true
 }
 
@@ -365,13 +351,13 @@ func deleteModuleInStore(identifier StoreIdentifier) error {
 	return os.RemoveAll(identifier.toFilePath())
 }
 
-func AddModuleInVault(metadata *Metadata, module *MetadataURL) error {
+func AddModuleInVault(metadata *Metadata, module *Store) error {
 	return MutateVault(func(vault *Vault) bool {
 		return vault.setModule(metadata, module)
 	})
 }
 
-func ToggleModuleInVault(identifier StoreIdentifier, enabled bool) error {
+func ToggleModuleInVault(identifier StoreIdentifier) error {
 	vault, err := GetVault()
 	if err != nil {
 		return err
@@ -382,14 +368,17 @@ func ToggleModuleInVault(identifier StoreIdentifier, enabled bool) error {
 		return errors.New("no modules with identifier " + identifier.toPath())
 	}
 
-	if enabled {
-		modules.Enabled = identifier.Version
-		createSymlink(identifier)
-	} else if modules.Enabled == identifier.Version {
-		modules.Enabled = ""
-		destroySymlink(identifier.ModuleIdentifier)
-	} else {
+	if modules.Enabled == identifier.Version {
 		return nil
+	}
+
+	modules.Enabled = identifier.Version
+
+	destroySymlink(identifier.ModuleIdentifier)
+	if len(modules.Enabled) > 0 {
+		if err := createSymlink(identifier); err != nil {
+			return err
+		}
 	}
 
 	return SetVault(vault)
@@ -405,7 +394,7 @@ func RemoveModuleInVault(identifier StoreIdentifier) error {
 			modules.Enabled = ""
 			destroySymlink(identifier.ModuleIdentifier)
 		}
-		delete(modules.Metadatas, identifier.Version)
+		delete(modules.V, identifier.Version)
 		return true
 	})
 }
@@ -423,11 +412,9 @@ func InstallModuleMURL(metadataURL URL) error {
 		return err
 	}
 
-	moduleIdentifier := metadata.getModuleIdentifier()
-
-	return AddModuleInVault(&metadata, &MetadataURL{
-		Local:  "/modules/" + moduleIdentifier.toPath() + "/metadata.json",
-		Remote: metadataURL,
+	return AddModuleInVault(&metadata, &Store{
+		Installed: true,
+		Remote:    metadataURL,
 	})
 }
 
@@ -438,10 +425,10 @@ func DeleteModule(identifier StoreIdentifier) error {
 	return deleteModuleInStore(identifier)
 }
 
-func createSymlink(identifier StoreIdentifier) {
-	os.Symlink(identifier.toFilePath(), identifier.ModuleIdentifier.toFilePath())
+func createSymlink(identifier StoreIdentifier) error {
+	return os.Symlink(identifier.toFilePath(), identifier.ModuleIdentifier.toFilePath())
 }
 
-func destroySymlink(identifier ModuleIdentifier) {
-	os.Remove(identifier.toFilePath())
+func destroySymlink(identifier ModuleIdentifier) error {
+	return os.Remove(identifier.toFilePath())
 }
