@@ -62,19 +62,7 @@ var pkgEnableCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		identifier := module.NewStoreIdentifier(args[0])
-		if err := module.ToggleModuleInVault(identifier, true); err != nil {
-			log.Fatalln(err.Error())
-		}
-	},
-}
-
-var pkgDisableCmd = &cobra.Command{
-	Use:   "disable [id]",
-	Short: "Disable installed module",
-	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		identifier := module.NewStoreIdentifier(args[0])
-		if err := module.ToggleModuleInVault(identifier, false); err != nil {
+		if err := module.ToggleModuleInVault(identifier); err != nil {
 			log.Fatalln(err.Error())
 		}
 	},
@@ -83,5 +71,5 @@ var pkgDisableCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(pkgCmd)
 
-	pkgCmd.AddCommand(pkgInstallCmd, pkgDeleteCmd, pkgEnableCmd, pkgDisableCmd)
+	pkgCmd.AddCommand(pkgInstallCmd, pkgDeleteCmd, pkgEnableCmd)
 }

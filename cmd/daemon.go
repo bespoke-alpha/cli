@@ -142,7 +142,7 @@ func startDaemon() {
 		log.Fatalln(err)
 	}
 
-	http.HandleFunc("/protocol", handleWebSocketProtocol)
+	http.HandleFunc("/rpc", handleWebSocketProtocol)
 	log.Panicln(http.ListenAndServe("localhost:7967", nil))
 
 	<-c
@@ -172,9 +172,11 @@ func handleWebSocketProtocol(w http.ResponseWriter, r *http.Request) {
 
 		incoming := string(p)
 		log.Println("recv:", incoming)
-		if err = HandleProtocol(incoming); err != nil {
+		res, err := HandleProtocol(incoming)
+		if err != nil {
 			log.Println("!handle:", err)
 		}
+		c.WriteMessage(websocket.TextMessage, []byte(res))
 	}
 }
 
