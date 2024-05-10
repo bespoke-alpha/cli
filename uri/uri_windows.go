@@ -23,6 +23,8 @@ package uri
 
 import (
 	"bespoke/paths"
+	"io"
+	"os"
 	"path/filepath"
 
 	"golang.org/x/sys/windows/registry"
@@ -49,7 +51,33 @@ func RegisterURIScheme() error {
 	if err != nil {
 		return err
 	}
-	bin := filepath.Join(paths.ConfigPath, "cli", "bespoke.exe")
+	bin := filepath.Join(paths.ConfigPath, "bespoke.exe")
+
+	if err := copyExeToBin(bin); err != nil {
+		return err
+	}
+
 	cmd := `"` + bin + `" protocol "%1"`
 	return key.SetStringValue("", cmd)
+}
+
+func copyExeToBin(bin string) error {
+	exe, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	src, err := os.Open(exe)
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+
+	dest, err := os.Create(bin)
+	if err != nil {
+		return err
+	}
+	defer dest.Close()
+
+	_, err = io.Copy(dest, src)
+	return err
 }
