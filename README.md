@@ -53,9 +53,6 @@ GPLv3. See [COPYING](COPYING).
 ## Todos
 
 -   Add a "spotify.version" semver prop to Metadata.json that will be used to disable non-conforming modules
--   Improve classname remapping:
-    -   Hook into postcss & swc transpiration
-    -   Maintain classname maps on a per version basis
 
 ---
 
