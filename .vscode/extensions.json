@@ -1,3 +1,9 @@
 {
-    "recommendations": ["timonwong.shellcheck", "oven.bun-vscode", "biomejs.biome", "golang.go"]
+    "recommendations": [
+        "golang.go",
+        "timonwong.shellcheck",
+        "oven.bun-vscode",
+        "biomejs.biome",
+        "bradlc.vscode-tailwindcss"
+    ]
 }
