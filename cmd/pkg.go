@@ -26,26 +26,36 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var useLocalPath bool
+
 var pkgCmd = &cobra.Command{
-	Use:   "pkg [action]",
+	Use:   "pkg action",
 	Short: "Manage modules",
 	Run:   func(cmd *cobra.Command, args []string) {},
 }
 
 var pkgInstallCmd = &cobra.Command{
-	Use:   "install [murl]",
+	Use:   "install murl",
 	Short: "Install module",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		metadataURL := args[0]
-		if err := module.InstallModuleMURL(metadataURL); err != nil {
+
+		var err error
+		if useLocalPath {
+			err = module.InstallModuleLocal(metadataURL)
+		} else {
+			err = module.InstallModuleRemote(metadataURL)
+		}
+
+		if err != nil {
 			log.Fatalln(err.Error())
 		}
 	},
 }
 
 var pkgDeleteCmd = &cobra.Command{
-	Use:   "rem [id]",
+	Use:   "rem id",
 	Short: "Uninstall module",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
@@ -57,7 +67,7 @@ var pkgDeleteCmd = &cobra.Command{
 }
 
 var pkgEnableCmd = &cobra.Command{
-	Use:   "enable [id]",
+	Use:   "enable id",
 	Short: "Enable installed module",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
@@ -72,4 +82,6 @@ func init() {
 	rootCmd.AddCommand(pkgCmd)
 
 	pkgCmd.AddCommand(pkgInstallCmd, pkgDeleteCmd, pkgEnableCmd)
+
+	pkgInstallCmd.Flags().BoolVar(&useLocalPath, "local", false, "Use local path")
 }

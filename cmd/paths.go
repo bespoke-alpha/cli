@@ -32,8 +32,8 @@ var (
 	showConfig        bool
 )
 
-var configCmd = &cobra.Command{
-	Use:   "path",
+var pathsCmd = &cobra.Command{
+	Use:   "paths",
 	Short: "Print bespoke config",
 	Run: func(cmd *cobra.Command, args []string) {
 		if !showSpotiyData && !showSpotifyConfig && !showConfig {
@@ -55,9 +55,9 @@ var configCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(configCmd)
+	rootCmd.AddCommand(pathsCmd)
 
-	configCmd.Flags().BoolVar(&showSpotiyData, "spotify-data", false, "Show Spotify data path")
-	configCmd.Flags().BoolVar(&showSpotiyData, "spotify-config", false, "Show Spotify config path")
-	configCmd.Flags().BoolVar(&showConfig, "config", false, "Show config path")
+	pathsCmd.Flags().BoolVar(&showSpotiyData, "spotify-data", false, "Show Spotify data path")
+	pathsCmd.Flags().BoolVar(&showSpotiyData, "spotify-config", false, "Show Spotify config path")
+	pathsCmd.Flags().BoolVar(&showConfig, "config", false, "Show config path")
 }

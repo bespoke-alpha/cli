@@ -109,8 +109,8 @@ func (ghp VersionedGithubPath) getRepoArchiveLink() string {
 }
 
 type Store struct {
-	Installed bool `json:"local"`
-	Remote    URL  `json:"remote"`
+	Installed bool      `json:"local"`
+	Remote    RemoteURL `json:"remote"`
 }
 
 type Author string
@@ -118,58 +118,58 @@ type Name string
 type Version string
 
 type ByAuthors = map[Author]ByNames
-type ByNames = map[Name]ByVersions
-type ByVersions struct {
-	Enabled Version           `json:"enabled"`
-	V       map[Version]Store `json:"v"`
+type ByNames = map[Name]Module
+type ByVersions = map[Version]Store
+type Module struct {
+	Enabled Version    `json:"enabled"`
+	V       ByVersions `json:"v"`
 }
 type Vault struct {
 	Modules ByAuthors `json:"modules"`
 }
 
-func (v *Vault) getAllModuleVersions(identifier ModuleIdentifier) (ByVersions, bool) {
-	names, ok := v.Modules[identifier.Author]
+func (v *Vault) getModule(identifier ModuleIdentifier) *Module {
+	byNames, ok := v.Modules[identifier.Author]
 	if !ok {
-		return ByVersions{}, false
+		byNames = make(ByNames)
+		v.Modules[identifier.Author] = byNames
 	}
-	versions, ok := names[identifier.Name]
-	return versions, ok
+	byVersions, ok := byNames[identifier.Name]
+	if !ok {
+		byVersions = Module{
+			V: make(ByVersions),
+		}
+		byNames[identifier.Name] = byVersions
+	}
+	return &byVersions
+
 }
 
-func (v *Vault) getEnabledModule(identifier ModuleIdentifier) (*Store, bool) {
+func (v *Vault) getEnabledStore(identifier ModuleIdentifier) (*Store, bool) {
 	module := Store{}
-	versions, ok := v.getAllModuleVersions(identifier)
-	if !ok {
-		return &module, false
-	}
-	module, ok = versions.V[versions.Enabled]
+	versions := v.getModule(identifier)
+	module, ok := versions.V[versions.Enabled]
 	return &module, ok
 }
 
-func (v *Vault) getModule(m *Metadata) (Store, bool) {
-	module := Store{}
-	versions, ok := v.getAllModuleVersions(m.getModuleIdentifier())
-	if !ok {
-		return module, false
-	}
-	module, ok = versions.V[Version(m.Version)]
-	return module, ok
+func (v *Vault) getStore(m *Metadata) (*Store, bool) {
+	versions := v.getModule(m.getModuleIdentifier())
+	store, ok := versions.V[Version(m.Version)]
+	return &store, ok
 }
 
 func (v *Vault) setModule(m *Metadata, module *Store) bool {
 	if len(m.Version) == 0 {
 		return false
 	}
-	versions, ok := v.getAllModuleVersions(m.getModuleIdentifier())
-	if !ok {
-		return false
-	}
+	versions := v.getModule(m.getModuleIdentifier())
 	versions.V[Version(m.Version)] = *module
 	return true
 }
 
 // https://raw.githubusercontent.com/<owner>/<repo>/<branch|tag|commit>/path/to/module/metadata.json
-type URL = string
+type RemoteURL = string
+type LocalURL = string
 
 type ModuleIdentifier struct {
 	Author
@@ -266,7 +266,7 @@ func parseMetadata(r io.Reader) (Metadata, error) {
 	return metadata, nil
 }
 
-func fetchRemoteMetadata(metadataURL URL) (Metadata, error) {
+func fetchRemoteMetadata(metadataURL RemoteURL) (Metadata, error) {
 	res, err := http.Get(metadataURL)
 	if err != nil {
 		return Metadata{}, err
@@ -276,7 +276,17 @@ func fetchRemoteMetadata(metadataURL URL) (Metadata, error) {
 	return parseMetadata(res.Body)
 }
 
-func parseGithubRawLink(metadataURL URL) (VersionedGithubPath, error) {
+func fetchLocalMetadata(metadataURL LocalURL) (Metadata, error) {
+	file, err := os.Open(metadataURL)
+	if err != nil {
+		return Metadata{}, err
+	}
+	defer file.Close()
+
+	return parseMetadata(file)
+}
+
+func parseGithubRawLink(metadataURL RemoteURL) (VersionedGithubPath, error) {
 
 	submatches := githubRawRe.FindStringSubmatch(metadataURL)
 	if submatches == nil {
@@ -330,7 +340,7 @@ func parseGithubRawLink(metadataURL URL) (VersionedGithubPath, error) {
 	}, nil
 }
 
-func downloadModuleInStore(metadataURL URL, storeIdentifier StoreIdentifier) error {
+func downloadModuleInStore(metadataURL RemoteURL, storeIdentifier StoreIdentifier) error {
 	githubPath, err := parseGithubRawLink(metadataURL)
 	if err != nil {
 		return err
@@ -363,19 +373,22 @@ func ToggleModuleInVault(identifier StoreIdentifier) error {
 		return err
 	}
 
-	modules, ok := vault.getAllModuleVersions(identifier.ModuleIdentifier)
-	if !ok {
-		return errors.New("no modules with identifier " + identifier.toPath())
-	}
+	module := vault.getModule(identifier.ModuleIdentifier)
 
-	if modules.Enabled == identifier.Version {
+	if module.Enabled == identifier.Version {
 		return nil
 	}
 
-	modules.Enabled = identifier.Version
+	if len(identifier.Version) > 0 {
+		if _, ok := module.V[identifier.Version]; !ok {
+			return errors.New("Can't find matching " + identifier.toPath())
+		}
+	}
+
+	module.Enabled = identifier.Version
 
 	destroySymlink(identifier.ModuleIdentifier)
-	if len(modules.Enabled) > 0 {
+	if len(module.Enabled) > 0 {
 		if err := createSymlink(identifier); err != nil {
 			return err
 		}
@@ -386,10 +399,8 @@ func ToggleModuleInVault(identifier StoreIdentifier) error {
 
 func RemoveModuleInVault(identifier StoreIdentifier) error {
 	return MutateVault(func(vault *Vault) bool {
-		modules, ok := vault.getAllModuleVersions(identifier.ModuleIdentifier)
-		if !ok {
-			return false
-		}
+		modules := vault.getModule(identifier.ModuleIdentifier)
+
 		if modules.Enabled == identifier.Version {
 			modules.Enabled = ""
 			destroySymlink(identifier.ModuleIdentifier)
@@ -399,7 +410,7 @@ func RemoveModuleInVault(identifier StoreIdentifier) error {
 	})
 }
 
-func InstallModuleMURL(metadataURL URL) error {
+func InstallModuleRemote(metadataURL RemoteURL) error {
 	metadata, err := fetchRemoteMetadata(metadataURL)
 	if err != nil {
 		return err
@@ -415,6 +426,23 @@ func InstallModuleMURL(metadataURL URL) error {
 	return AddModuleInVault(&metadata, &Store{
 		Installed: true,
 		Remote:    metadataURL,
+	})
+}
+
+func InstallModuleLocal(metadataURL LocalURL) error {
+	metadata, err := fetchLocalMetadata(metadataURL)
+	if err != nil {
+		return err
+	}
+
+	storeIdentifier := metadata.getStoreIdentifier()
+
+	if err := os.Symlink(filepath.Dir(metadataURL), storeIdentifier.toFilePath()); err != nil {
+		return err
+	}
+
+	return AddModuleInVault(&metadata, &Store{
+		Installed: true,
 	})
 }
 

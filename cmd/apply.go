@@ -90,7 +90,7 @@ func symlinkFiles(destXpuiPath string) error {
 	for _, folder := range folders {
 		folderSrcPath := filepath.Join(paths.ConfigPath, folder)
 		folderDestPath := filepath.Join(destXpuiPath, folder)
-		log.Println("Symlinking", folderSrcPath, "->", folderDestPath)
+		log.Println("Symlinking", folderDestPath, "->", folderSrcPath)
 		if err := os.Symlink(folderSrcPath, folderDestPath); err != nil {
 			return err
 		}

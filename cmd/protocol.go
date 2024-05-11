@@ -64,7 +64,7 @@ func hp(action, arguments string) error {
 	switch action {
 	case "add":
 		metadataURL := arguments
-		return module.InstallModuleMURL(metadataURL)
+		return module.InstallModuleRemote(metadataURL)
 
 	case "remove":
 		identifier := module.NewStoreIdentifier(arguments)
