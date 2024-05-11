@@ -134,15 +134,24 @@ func (v *Vault) getModule(identifier ModuleIdentifier) *Module {
 		byNames = make(ByNames)
 		v.Modules[identifier.Author] = byNames
 	}
-	byVersions, ok := byNames[identifier.Name]
+	module, ok := byNames[identifier.Name]
 	if !ok {
-		byVersions = Module{
-			V: make(ByVersions),
+		module = Module{
+			Enabled: "",
+			V:       make(ByVersions),
 		}
-		byNames[identifier.Name] = byVersions
+		byNames[identifier.Name] = module
 	}
-	return &byVersions
+	return &module
+}
 
+func (v *Vault) setModule(identifier ModuleIdentifier, module *Module) {
+	byNames, ok := v.Modules[identifier.Author]
+	if !ok {
+		byNames = make(ByNames)
+		v.Modules[identifier.Author] = byNames
+	}
+	byNames[identifier.Name] = *module
 }
 
 func (v *Vault) getEnabledStore(identifier ModuleIdentifier) (*Store, bool) {
@@ -158,12 +167,12 @@ func (v *Vault) getStore(m *Metadata) (*Store, bool) {
 	return &store, ok
 }
 
-func (v *Vault) setModule(m *Metadata, module *Store) bool {
-	if len(m.Version) == 0 {
+func (v *Vault) setStore(identifier StoreIdentifier, module *Store) bool {
+	if len(string(identifier.Version)) == 0 {
 		return false
 	}
-	versions := v.getModule(m.getModuleIdentifier())
-	versions.V[Version(m.Version)] = *module
+	versions := v.getModule(identifier.ModuleIdentifier)
+	versions.V[identifier.Version] = *module
 	return true
 }
 
@@ -182,8 +191,8 @@ var moduleIdentifierRe = regexp.MustCompile(`^(?<author>[^/]+)/(?<name>[^/]+)$`)
 func NewModuleIdentifier(identifier string) ModuleIdentifier {
 	parts := moduleIdentifierRe.FindStringSubmatch(identifier)
 	return ModuleIdentifier{
-		Author: Author(parts[0]),
-		Name:   Name(parts[1]),
+		Author: Author(parts[1]),
+		Name:   Name(parts[2]),
 	}
 }
 
@@ -206,8 +215,8 @@ var storeIdentifierRe = regexp.MustCompile(`^(?<identifier>[^/]+/[^/]+)/(?<versi
 func NewStoreIdentifier(identifier string) StoreIdentifier {
 	parts := storeIdentifierRe.FindStringSubmatch(identifier)
 	return StoreIdentifier{
-		ModuleIdentifier: NewModuleIdentifier(parts[0]),
-		Version:          Version(parts[1]),
+		ModuleIdentifier: NewModuleIdentifier(parts[1]),
+		Version:          Version(parts[2]),
 	}
 }
 
@@ -363,7 +372,7 @@ func deleteModuleInStore(identifier StoreIdentifier) error {
 
 func AddModuleInVault(metadata *Metadata, module *Store) error {
 	return MutateVault(func(vault *Vault) bool {
-		return vault.setModule(metadata, module)
+		return vault.setStore(metadata.getStoreIdentifier(), module)
 	})
 }
 
@@ -379,13 +388,14 @@ func ToggleModuleInVault(identifier StoreIdentifier) error {
 		return nil
 	}
 
-	if len(identifier.Version) > 0 {
+	if len(string(identifier.Version)) > 0 {
 		if _, ok := module.V[identifier.Version]; !ok {
 			return errors.New("Can't find matching " + identifier.toPath())
 		}
 	}
 
 	module.Enabled = identifier.Version
+	vault.setModule(identifier.ModuleIdentifier, module)
 
 	destroySymlink(identifier.ModuleIdentifier)
 	if len(module.Enabled) > 0 {
@@ -399,13 +409,15 @@ func ToggleModuleInVault(identifier StoreIdentifier) error {
 
 func RemoveModuleInVault(identifier StoreIdentifier) error {
 	return MutateVault(func(vault *Vault) bool {
-		modules := vault.getModule(identifier.ModuleIdentifier)
+		module := vault.getModule(identifier.ModuleIdentifier)
 
-		if modules.Enabled == identifier.Version {
-			modules.Enabled = ""
+		if module.Enabled == identifier.Version {
+			module.Enabled = ""
 			destroySymlink(identifier.ModuleIdentifier)
 		}
-		delete(modules.V, identifier.Version)
+
+		delete(module.V, identifier.Version)
+		vault.setModule(identifier.ModuleIdentifier, module)
 		return true
 	})
 }
@@ -436,8 +448,7 @@ func InstallModuleLocal(metadataURL LocalURL) error {
 	}
 
 	storeIdentifier := metadata.getStoreIdentifier()
-
-	if err := os.Symlink(filepath.Dir(metadataURL), storeIdentifier.toFilePath()); err != nil {
+	if err := ensureSymlink(filepath.Dir(metadataURL), storeIdentifier.toFilePath()); err != nil {
 		return err
 	}
 
@@ -453,8 +464,15 @@ func DeleteModule(identifier StoreIdentifier) error {
 	return deleteModuleInStore(identifier)
 }
 
+func ensureSymlink(oldname string, newname string) error {
+	if err := os.MkdirAll(filepath.Dir(newname), 0755); err != nil {
+		return err
+	}
+	return os.Symlink(oldname, newname)
+}
+
 func createSymlink(identifier StoreIdentifier) error {
-	return os.Symlink(identifier.toFilePath(), identifier.ModuleIdentifier.toFilePath())
+	return ensureSymlink(identifier.toFilePath(), identifier.ModuleIdentifier.toFilePath())
 }
 
 func destroySymlink(identifier ModuleIdentifier) error {
