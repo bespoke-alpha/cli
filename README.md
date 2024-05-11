@@ -52,11 +52,14 @@ GPLv3. See [COPYING](COPYING).
 
 ## Todos
 
--   Add a "spotify.version" semver prop to Metadata.json that will be used to disable non-conforming modules
+-    Create new cssmap.json [incremental]
+-    Refactor stdlib (breakdown & modularize the S object)
+-    Refine CLI output, add TUI
+
 
 ---
 
--   Add TUI for when bespoke is executed without arguments
+-   Add a "spotify.version" semver prop to Metadata.json that will be used to disable non-conforming modules
 
 ---
 
