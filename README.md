@@ -12,7 +12,7 @@ Note: On windows, use `pwsh` and not `cmd` as shell!
         ```pwsh
         $user = [EnvironmentVariableTarget]::User
         $path = [Environment]::GetEnvironmentVariable('PATH', $user)
-        $path = "$path;$env:LOCALAPPDATA\cli"
+        $path = "$path;$env:LOCALAPPDATA\bespoke"
         [Environment]::SetEnvironmentVariable('PATH', $path, $user)
         ```
     - On a default macOS installation, run the following:
