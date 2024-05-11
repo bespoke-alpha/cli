@@ -55,7 +55,7 @@ var pkgInstallCmd = &cobra.Command{
 }
 
 var pkgDeleteCmd = &cobra.Command{
-	Use:   "rem id",
+	Use:   "delete id",
 	Short: "Uninstall module",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
