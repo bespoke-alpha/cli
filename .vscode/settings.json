@@ -1,25 +1,9 @@
 {
-    "editor.formatOnSave": true,
-    "[go]": {
-        "editor.defaultFormatter": "golang.go"
-    },
-    "[powershell]": {
-        "editor.defaultFormatter": "ms-vscode.powershell"
-    },
-    "[javascript]": {
-        "editor.defaultFormatter": "biomejs.biome"
-    },
-    "[typescript]": {
-        "editor.defaultFormatter": "biomejs.biome"
-    },
-    "[json]": {
-        "editor.defaultFormatter": "biomejs.biome"
-    },
-    "explorer.fileNesting.enabled": true,
-    "explorer.fileNesting.expand": false,
-    "explorer.fileNesting.patterns": {
-        "*.ts": "${capture}.js",
-        "*.tsx": "${capture}.js",
-        "*.scss": "${capture}.css"
-    }
+   "editor.formatOnSave": true,
+   "[go]": {
+      "editor.defaultFormatter": "golang.go"
+   },
+   "[powershell]": {
+      "editor.defaultFormatter": "ms-vscode.powershell"
+   }
 }
