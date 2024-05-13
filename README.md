@@ -12,12 +12,12 @@ Note: On windows, use `pwsh` and not `cmd` as shell!
         ```pwsh
         $user = [EnvironmentVariableTarget]::User
         $path = [Environment]::GetEnvironmentVariable('PATH', $user)
-        $path = "$path;$env:LOCALAPPDATA\bespoke"
+        $path = "$path;$env:LOCALAPPDATA\bespoke\bin"
         [Environment]::SetEnvironmentVariable('PATH', $path, $user)
         ```
     - On a default macOS installation, run the following:
         ```zsh
-        echo "$HOME/Library/Application Support/bespoke/cli" >> /etc/paths
+        echo "$HOME/Library/Application Support/bespoke/bin" >> /etc/paths
         ```
     - On other platforms you can perform a simple search on how to set the PATH environment variable
 4. Run `./bespoke init` to initialize the bespoke setup, this only needs to be done once. If the command fails, try running it in an elevated shell (as Administrator)

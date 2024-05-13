@@ -51,7 +51,7 @@ func RegisterURIScheme() error {
 	if err != nil {
 		return err
 	}
-	bin := filepath.Join(paths.ConfigPath, "bespoke.exe")
+	bin := filepath.Join(paths.ConfigPath, "bin", "bespoke.exe")
 
 	if err := copyExeToBin(bin); err != nil {
 		return err
