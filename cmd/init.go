@@ -70,5 +70,9 @@ func execInit() error {
 		log.Println(err.Error())
 	}
 
-	return module.SetVault(&module.Vault{Modules: map[module.Author]map[module.Name]module.Module{}})
+	return module.SetVault(&module.Vault{Modules: map[module.ModuleIdentifierStr]module.Module{
+		"official/stdlib": module.Module{
+			Remotes: []string{"https://github.com/spicetify/stdlib/repo.json"},
+		},
+	}})
 }
