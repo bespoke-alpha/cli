@@ -108,8 +108,8 @@ func (ghp VersionedGithubPath) getRepoArchiveLink() string {
 }
 
 type Store struct {
-	Installed bool      `json:"local"`
-	Remote    RemoteURL `json:"remote"`
+	Installed RemoteURL   `json:"installed"`
+	Metadatas []RemoteURL `json:"metadatas"`
 }
 
 type Author string
@@ -425,8 +425,8 @@ func InstallModuleRemote(metadataURL RemoteURL) error {
 	}
 
 	return AddModuleInVault(&metadata, &Store{
-		Installed: true,
-		Remote:    metadataURL,
+		Installed: metadataURL,
+		Metadatas: []string{metadataURL},
 	})
 }
 
@@ -442,7 +442,8 @@ func InstallModuleLocal(metadataURL LocalURL) error {
 	}
 
 	return AddModuleInVault(&metadata, &Store{
-		Installed: true,
+		Installed: metadataURL,
+		Metadatas: []string{},
 	})
 }
 
