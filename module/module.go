@@ -50,7 +50,7 @@ type Metadata struct {
 		Css   string `json:"css"`
 		Mixin string `json:"mixin"`
 	} `json:"entries"`
-	Dependencies []string `json:"dependencies"`
+	Dependencies map[string]string `json:"dependencies"`
 }
 
 func (m *Metadata) getAuthor() string {
