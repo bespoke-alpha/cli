@@ -50,8 +50,7 @@ type Metadata struct {
 		Css   string `json:"css"`
 		Mixin string `json:"mixin"`
 	} `json:"entries"`
-	Dependencies    []string `json:"dependencies"`
-	SpotifyVersions string   `json:"spotifyVersions"`
+	Dependencies []string `json:"dependencies"`
 }
 
 func (m *Metadata) getAuthor() string {
@@ -116,45 +115,34 @@ type Store struct {
 type Author string
 type Name string
 type Version string
+type ModuleIdentifierStr string
 
-type ByAuthors = map[Author]ByNames
-type ByNames = map[Name]Module
-type ByVersions = map[Version]Store
 type Module struct {
-	Enabled Version    `json:"enabled"`
-	V       ByVersions `json:"v"`
+	Enabled Version           `json:"enabled"`
+	Remotes []string          `json:"remotes"`
+	V       map[Version]Store `json:"v"`
 }
 type Vault struct {
-	Modules ByAuthors `json:"modules"`
+	Modules map[ModuleIdentifierStr]Module `json:"modules"`
 }
 
-func (v *Vault) getModule(identifier ModuleIdentifier) *Module {
-	byNames, ok := v.Modules[identifier.Author]
-	if !ok {
-		byNames = make(ByNames)
-		v.Modules[identifier.Author] = byNames
-	}
-	module, ok := byNames[identifier.Name]
+func (v *Vault) getModule(identifier ModuleIdentifierStr) *Module {
+	module, ok := v.Modules[identifier]
 	if !ok {
 		module = Module{
 			Enabled: "",
-			V:       make(ByVersions),
+			V:       map[Version]Store{},
 		}
-		byNames[identifier.Name] = module
+		v.Modules[identifier] = module
 	}
 	return &module
 }
 
-func (v *Vault) setModule(identifier ModuleIdentifier, module *Module) {
-	byNames, ok := v.Modules[identifier.Author]
-	if !ok {
-		byNames = make(ByNames)
-		v.Modules[identifier.Author] = byNames
-	}
-	byNames[identifier.Name] = *module
+func (v *Vault) setModule(identifier ModuleIdentifierStr, module *Module) {
+	v.Modules[identifier] = *module
 }
 
-func (v *Vault) getEnabledStore(identifier ModuleIdentifier) (*Store, bool) {
+func (v *Vault) getEnabledStore(identifier ModuleIdentifierStr) (*Store, bool) {
 	module := Store{}
 	versions := v.getModule(identifier)
 	module, ok := versions.V[versions.Enabled]
@@ -162,7 +150,8 @@ func (v *Vault) getEnabledStore(identifier ModuleIdentifier) (*Store, bool) {
 }
 
 func (v *Vault) getStore(m *Metadata) (*Store, bool) {
-	versions := v.getModule(m.getModuleIdentifier())
+	moduleIdentifier := m.getModuleIdentifier()
+	versions := v.getModule(moduleIdentifier.toPath())
 	store, ok := versions.V[Version(m.Version)]
 	return &store, ok
 }
@@ -171,7 +160,7 @@ func (v *Vault) setStore(identifier StoreIdentifier, module *Store) bool {
 	if len(string(identifier.Version)) == 0 {
 		return false
 	}
-	versions := v.getModule(identifier.ModuleIdentifier)
+	versions := v.getModule(identifier.ModuleIdentifier.toPath())
 	versions.V[identifier.Version] = *module
 	return true
 }
@@ -196,8 +185,8 @@ func NewModuleIdentifier(identifier string) ModuleIdentifier {
 	}
 }
 
-func (mi *ModuleIdentifier) toPath() string {
-	return path.Join(string(mi.Author), string(mi.Name))
+func (mi *ModuleIdentifier) toPath() ModuleIdentifierStr {
+	return ModuleIdentifierStr(path.Join(string(mi.Author), string(mi.Name)))
 }
 
 func (mi *ModuleIdentifier) toFilePath() string {
@@ -382,7 +371,7 @@ func ToggleModuleInVault(identifier StoreIdentifier) error {
 		return err
 	}
 
-	module := vault.getModule(identifier.ModuleIdentifier)
+	module := vault.getModule(identifier.ModuleIdentifier.toPath())
 
 	if module.Enabled == identifier.Version {
 		return nil
@@ -395,7 +384,7 @@ func ToggleModuleInVault(identifier StoreIdentifier) error {
 	}
 
 	module.Enabled = identifier.Version
-	vault.setModule(identifier.ModuleIdentifier, module)
+	vault.setModule(identifier.ModuleIdentifier.toPath(), module)
 
 	destroySymlink(identifier.ModuleIdentifier)
 	if len(module.Enabled) > 0 {
@@ -409,7 +398,7 @@ func ToggleModuleInVault(identifier StoreIdentifier) error {
 
 func RemoveModuleInVault(identifier StoreIdentifier) error {
 	return MutateVault(func(vault *Vault) bool {
-		module := vault.getModule(identifier.ModuleIdentifier)
+		module := vault.getModule(identifier.ModuleIdentifier.toPath())
 
 		if module.Enabled == identifier.Version {
 			module.Enabled = ""
@@ -417,7 +406,7 @@ func RemoveModuleInVault(identifier StoreIdentifier) error {
 		}
 
 		delete(module.V, identifier.Version)
-		vault.setModule(identifier.ModuleIdentifier, module)
+		vault.setModule(identifier.ModuleIdentifier.toPath(), module)
 		return true
 	})
 }
